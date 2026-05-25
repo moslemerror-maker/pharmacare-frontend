@@ -40,9 +40,15 @@ export default function PatientDetail() {
   const {id} = useParams(); const navigate = useNavigate()
   const [tab,setTab] = useState('vitals')
   const [showVitals,setShowVitals] = useState(false)
-  const {data:p,isLoading} = useQuery({queryKey:['patient',id],queryFn:()=>api.get(`/patients/${id}`).then(r=>r.data)})
-  if(isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
-  if(!p) return <div className="p-6 text-red-500">Patient not found</div>
+  const {data:p,isPending,isError} = useQuery({queryKey:['patient',id],queryFn:()=>api.get(`/patients/${id}`).then(r=>r.data),retry:1})
+  if(isPending) return (
+    <div className="p-6 max-w-5xl mx-auto animate-pulse space-y-4">
+      <div className="h-8 w-32 bg-gray-200 rounded"/>
+      <div className="card-p flex gap-4 items-center"><div className="w-14 h-14 bg-gray-200 rounded-2xl"/><div className="space-y-2 flex-1"><div className="h-5 w-48 bg-gray-200 rounded"/><div className="h-4 w-64 bg-gray-100 rounded"/></div></div>
+    </div>
+  )
+  if(isError) return <div className="p-6 flex flex-col items-center justify-center gap-3 text-center"><p className="text-lg font-semibold text-gray-700">Could not load patient</p><p className="text-sm text-gray-400">The server returned an error. Please go back and try again.</p><button onClick={()=>navigate(-1)} className="btn-secondary btn-sm mt-2"><ArrowLeft size={13}/>Go back</button></div>
+  if(!p) return <div className="p-6 flex flex-col items-center justify-center gap-3 text-center"><p className="text-lg font-semibold text-gray-700">Patient not found</p><p className="text-sm text-gray-400">No patient with this ID exists in the system.</p><button onClick={()=>navigate('/patients')} className="btn-secondary btn-sm mt-2"><ArrowLeft size={13}/>Back to Patients</button></div>
   const latestVitals = p.vitals?.[0]
   return (
     <div className="p-6 max-w-5xl mx-auto">

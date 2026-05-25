@@ -62,37 +62,60 @@ function MedRow({ med, idx, onChange, onRemove }) {
     queryFn: () => api.get('/medicines', { params:{ search:q, limit:8 } }).then(r=>r.data),
     enabled: q.length > 1 && !med.medicine_id,
   })
+  const { data: stockInfo } = useQuery({
+    queryKey: ['med-stock', med.medicine_id],
+    queryFn: () => api.get(`/inventory/batches/${med.medicine_id}`).then(r => r.data),
+    enabled: !!med.medicine_id,
+  })
+  const totalStock = stockInfo?.reduce((a, b) => a + b.available_qty, 0) ?? null
+
   useEffect(() => {
     const h = e => { if (!ref.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
   }, [])
+
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-      <div className="flex items-center gap-2">
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      {/* Medicine header row */}
+      <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100">
         <span className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{idx+1}</span>
         <div ref={ref} className="flex-1 relative">
-          <input className="input" placeholder="Type medicine name to search..."
+          <input className="input bg-white" placeholder="Type medicine name to search..."
             value={q}
             onChange={e=>{setQ(e.target.value);onChange({medicine_name:e.target.value,medicine_id:null});setOpen(true)}}
             onFocus={()=>setOpen(true)}/>
           {open && suggestions?.length > 0 && (
-            <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lift overflow-hidden">
+            <div className="absolute z-20 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
               {suggestions.map(s=>(
-                <button key={s.id} className="w-full px-3 py-2 text-left hover:bg-gray-50 text-sm flex justify-between"
+                <button key={s.id} className="w-full px-3 py-2.5 text-left hover:bg-primary/5 text-sm flex justify-between items-center gap-2"
                   onClick={()=>{
                     setQ(s.name); setOpen(false)
                     onChange({ medicine_name:s.name, medicine_id:s.id, dosage:s.strength||'', frequency:'Twice daily (BD)', duration:'5 days', quantity:10 })
                   }}>
-                  <span className="font-medium">{s.name}</span>
-                  <span className="text-xs text-gray-400">{s.form} · {s.strength}</span>
+                  <div>
+                    <span className="font-medium text-gray-800">{s.name}</span>
+                    <span className="text-xs text-gray-400 ml-2">{s.generic_name}</span>
+                  </div>
+                  <span className="text-xs text-gray-400 flex-shrink-0">{s.form} · {s.strength}</span>
                 </button>
               ))}
             </div>
           )}
         </div>
-        <button onClick={onRemove} className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+        {/* Stock badge */}
+        {totalStock !== null && (
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+            totalStock === 0 ? 'bg-red-100 text-red-700' :
+            totalStock <= 20 ? 'bg-orange-100 text-orange-700' :
+            'bg-green-100 text-green-700'
+          }`}>
+            {totalStock === 0 ? 'Out of stock' : totalStock <= 20 ? `Low stock (${totalStock})` : `In stock (${totalStock})`}
+          </span>
+        )}
+        <button onClick={onRemove} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-300 hover:text-red-500 flex-shrink-0"><Trash2 size={14}/></button>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      {/* Detail fields */}
+      <div className="px-4 py-3 bg-white grid grid-cols-2 md:grid-cols-4 gap-3">
         <div><label className="label">Dosage</label><input className="input" placeholder="1 tablet" value={med.dosage||''} onChange={e=>onChange({dosage:e.target.value})}/></div>
         <div><label className="label">Frequency</label>
           <select className="select" value={med.frequency||''} onChange={e=>onChange({frequency:e.target.value})}>
@@ -106,7 +129,8 @@ function MedRow({ med, idx, onChange, onRemove }) {
         </div>
         <div><label className="label">Qty</label><input className="input" type="number" min="1" value={med.quantity||''} onChange={e=>onChange({quantity:parseInt(e.target.value)||''})}/></div>
       </div>
-      <div><label className="label">Instructions</label>
+      <div className="px-4 pb-3 bg-white">
+        <label className="label">Instructions</label>
         <input className="input" placeholder="e.g. After meals, avoid alcohol..." value={med.instructions||''} onChange={e=>onChange({instructions:e.target.value})}/>
       </div>
     </div>
@@ -216,22 +240,35 @@ export default function NewPrescription() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={()=>navigate(-1)} className="btn-ghost btn-sm p-2"><ArrowLeft size={18}/></button>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">New Prescription</h1>
-          <p className="text-xs text-gray-500">Dr. {user?.name} · {user?.doctorProfile?.specialization}</p>
-        </div>
-        <div className="ml-auto flex gap-2">
-          <button className="btn-secondary" onClick={()=>navigate(-1)}>Cancel</button>
-          <button className="btn-primary" disabled={!canSave||mutation.isPending} onClick={()=>mutation.mutate()}>
-            <Save size={15}/>{mutation.isPending?'Saving...':'Save Prescription'}
-          </button>
+      {/* Clinical header */}
+      <div className="card-p mb-5 border-l-4 border-primary">
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <button onClick={()=>navigate(-1)} className="btn-ghost btn-sm p-1.5"><ArrowLeft size={16}/></button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-serif text-primary">℞</span>
+                <h1 className="text-xl font-bold text-gray-900">New Prescription</h1>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                <span className="font-medium text-gray-700">Dr. {user?.name}</span>
+                {user?.doctorProfile?.specialization && <span className="text-gray-400"> · {user.doctorProfile.specialization}</span>}
+                {user?.doctorProfile?.registration_number && <span className="text-gray-400"> · Reg: {user.doctorProfile.registration_number}</span>}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-secondary btn-sm" onClick={()=>navigate(-1)}>Cancel</button>
+            <button className="btn-primary btn-sm" disabled={!canSave||mutation.isPending} onClick={()=>mutation.mutate()}>
+              <Save size={13}/>{mutation.isPending?'Saving...':'Save Prescription'}
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Patient selector */}
       <div className="card-p mb-4">
-        <label className="label text-sm font-semibold mb-2 block">Select Patient *</label>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Patient *</label>
         <PatientSearch value={patient} onChange={setPatient}/>
       </div>
 

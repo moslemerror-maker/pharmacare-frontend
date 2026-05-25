@@ -8,8 +8,9 @@ import { fmt } from '../../utils/helpers'
 export default function SalesPage() {
   const navigate = useNavigate()
   const [search,setSearch] = useState('')
-  const [dateFrom,setDateFrom] = useState(new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().split('T')[0])
-  const [dateTo,setDateTo] = useState(new Date().toISOString().split('T')[0])
+  const today = new Date().toISOString().split('T')[0]
+  const [dateFrom,setDateFrom] = useState(today)
+  const [dateTo,setDateTo] = useState(today)
 
   const {data,isLoading} = useQuery({
     queryKey:['sales',dateFrom,dateTo,search],
