@@ -15,9 +15,10 @@ export default function PrescriptionList() {
   const [status,setStatus] = useState(sp.get('status')||'')
   const [search,setSearch] = useState('')
 
-  const {data,isLoading} = useQuery({
+  const {data,isPending,isError} = useQuery({
     queryKey:['prescriptions',status],
-    queryFn:()=>api.get('/prescriptions',{params:{status:status||undefined,limit:100}}).then(r=>r.data)
+    queryFn:()=>api.get('/prescriptions',{params:{status:status||undefined,limit:100}}).then(r=>r.data),
+    retry:1
   })
 
   const rows = (data?.data||[]).filter(rx=>!search||rx.patient_name?.toLowerCase().includes(search.toLowerCase())||rx.rx_number?.includes(search))
@@ -43,7 +44,7 @@ export default function PrescriptionList() {
             ))}
           </div>
         </div>
-        {isLoading ? <div className="p-8 text-center text-gray-400 text-sm">Loading…</div> : (
+        {isPending ? <div className="p-8 text-center text-gray-400 text-sm">Loading…</div> : isError ? <div className="p-8 text-center text-red-400 text-sm">Failed to load prescriptions — please refresh</div> : (
           <table className="w-full">
             <thead><tr><th className="th">Rx No.</th><th className="th">Patient</th><th className="th">Doctor</th><th className="th">Diagnosis</th><th className="th">Date</th><th className="th">Status</th><th className="th"></th></tr></thead>
             <tbody>

@@ -116,16 +116,17 @@ export default function ReportsPage() {
       {tab==='mis' && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label:'Sales Report',     desc:'All bills, GST breakdown, payment modes', icon:'📊' },
-            { label:'Stock Report',     desc:'All batches with expiry and valuation',   icon:'📦' },
-            { label:'Short Stock',      desc:'Low, critical & out of stock items',       icon:'⚠️' },
-            { label:'GST Summary',      desc:'HSN-wise CGST/SGST for return filing',     icon:'🧾' },
-          ].map(({label,desc,icon})=>(
-            <div key={label} className="card-p text-center hover:shadow-lift transition-shadow">
+            { label:'Sales Report',  type:'sales',      desc:'All bills, GST breakdown, payment modes', icon:'📊' },
+            { label:'Stock Report',  type:'inventory',  desc:'All batches with expiry and valuation',   icon:'📦' },
+            { label:'Short Stock',   type:'shortstock', desc:'Low, critical & out of stock items',       icon:'⚠️' },
+            { label:'GST Summary',   type:'gst',        desc:'HSN-wise CGST/SGST for return filing',     icon:'🧾' },
+          ].map(({label,type,desc,icon})=>(
+            <button key={label} onClick={()=>{ setMisType(type); }}
+              className={`card-p text-center hover:shadow-md transition-shadow w-full border-2 ${misType===type?'border-primary bg-primary/5':'border-transparent'}`}>
               <div className="text-3xl mb-2">{icon}</div>
               <p className="font-semibold text-gray-900 text-sm">{label}</p>
               <p className="text-xs text-gray-400 mt-1">{desc}</p>
-            </div>
+            </button>
           ))}
           <div className="col-span-2 md:col-span-4 bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
             ✅ Excel will contain <strong>{misType==='all'?'4 sheets (Info, Sales, Stock, GST)':'1 sheet'}</strong> for the period <strong>{dateFrom}</strong> to <strong>{dateTo}</strong>. Frozen header rows, color-coded alerts for low/expiring stock included.
