@@ -18,16 +18,24 @@ export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const doLogin = async (e, em, pw) => {
+    if (e) e.preventDefault()
     setLoading(true)
     try {
-      const user = await login(email, password)
+      const user = await login(em ?? email, pw ?? password)
       toast.success(`Welcome, ${user.name}!`)
       navigate('/')
     } catch (err) {
       toast.error(err.response?.data?.error || 'Login failed')
     } finally { setLoading(false) }
+  }
+
+  const handleSubmit = (e) => doLogin(e)
+
+  const handleDemo = (d) => {
+    setEmail(d.email)
+    setPassword(d.pass)
+    doLogin(null, d.email, d.pass)
   }
 
   return (
@@ -71,8 +79,8 @@ export default function LoginPage() {
             <p className="text-[11px] text-gray-400 text-center mb-3 font-medium uppercase tracking-wide">Demo logins</p>
             <div className="space-y-1.5">
               {DEMOS.map(d=>(
-                <button key={d.role} onClick={()=>{setEmail(d.email);setPassword(d.pass)}}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+                <button key={d.role} type="button" disabled={loading} onClick={()=>handleDemo(d)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50">
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${d.color}`}>{d.role}</span>
                   <span className="text-xs text-gray-400">{d.email}</span>
                 </button>
