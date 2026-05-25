@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, X, Save, Users, Shield } from 'lucide-react'
+import { Plus, X, Save, Users, Shield, Pencil } from 'lucide-react'
 import api from '../../utils/api'
 import { fmt } from '../../utils/helpers'
 import toast from 'react-hot-toast'
 
 function UserModal({ onClose }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ name:'', email:'', phone:'', password:'', role_name:'pharmacist', specialization:'', registration_number:'', qualification:'', clinic_name:'' })
+  const [form, setForm] = useState({ name:'', email:'', phone:'', password:'', role_name:'pharmacist', specialization:'', registration_number:'', qualification:'', clinic_name:'', clinic_address:'', clinic_phone:'' })
   const set = (k,v) => setForm(p=>({...p,[k]:v}))
 
   const { data: roles=[] } = useQuery({ queryKey:['roles'], queryFn:()=>api.get('/users/roles').then(r=>r.data) })
@@ -46,6 +46,8 @@ function UserModal({ onClose }) {
                 <div><label className="label">Specialization *</label><input className="input" value={form.specialization} onChange={e=>set('specialization',e.target.value)}/></div>
                 <div><label className="label">Qualification</label><input className="input" placeholder="MBBS, MD..." value={form.qualification} onChange={e=>set('qualification',e.target.value)}/></div>
                 <div><label className="label">Clinic Name</label><input className="input" value={form.clinic_name} onChange={e=>set('clinic_name',e.target.value)}/></div>
+                <div className="col-span-2"><label className="label">Clinic Address</label><input className="input" placeholder="Street, City, State – PIN" value={form.clinic_address} onChange={e=>set('clinic_address',e.target.value)}/></div>
+                <div><label className="label">Clinic Phone</label><input className="input" placeholder="+91 XXXXX XXXXX" value={form.clinic_phone} onChange={e=>set('clinic_phone',e.target.value)}/></div>
               </div>
             </div>
           )}
@@ -54,6 +56,64 @@ function UserModal({ onClose }) {
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn-primary" disabled={!form.name||!form.email||!form.password||mutation.isPending} onClick={()=>mutation.mutate()}>
             <Save size={14}/>{mutation.isPending?'Creating...':'Create User'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DoctorProfileModal({ userId, onClose }) {
+  const qc = useQueryClient()
+  const [form, setForm] = useState(null)
+  const set = (k,v) => setForm(p=>({...p,[k]:v}))
+
+  useQuery({
+    queryKey: ['doctor-profile', userId],
+    queryFn: () => api.get(`/users/doctors`).then(r => {
+      const doc = r.data.find(d => d.id === userId) || {}
+      setForm({
+        specialization: doc.specialization||'',
+        registration_number: doc.registration_number||'',
+        qualification: doc.qualification||'',
+        clinic_name: doc.clinic_name||'',
+        clinic_address: doc.clinic_address||'',
+        clinic_phone: doc.clinic_phone||'',
+      })
+      return doc
+    }),
+    enabled: !!userId,
+  })
+
+  const mutation = useMutation({
+    mutationFn: () => api.put(`/users/${userId}/doctor-profile`, form),
+    onSuccess: () => { toast.success('Profile updated'); qc.invalidateQueries(['users']); onClose() },
+    onError: e => toast.error(e.response?.data?.error || 'Failed'),
+  })
+
+  if (!form) return null
+
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal max-w-lg w-full">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Edit Doctor Profile</h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={16}/></button>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Registration No.</label><input className="input" value={form.registration_number} onChange={e=>set('registration_number',e.target.value)}/></div>
+            <div><label className="label">Specialization</label><input className="input" value={form.specialization} onChange={e=>set('specialization',e.target.value)}/></div>
+            <div><label className="label">Qualification</label><input className="input" placeholder="MBBS, MD..." value={form.qualification} onChange={e=>set('qualification',e.target.value)}/></div>
+            <div><label className="label">Clinic Name</label><input className="input" value={form.clinic_name} onChange={e=>set('clinic_name',e.target.value)}/></div>
+            <div className="col-span-2"><label className="label">Clinic Address</label><input className="input" placeholder="Street, City, State – PIN" value={form.clinic_address} onChange={e=>set('clinic_address',e.target.value)}/></div>
+            <div><label className="label">Clinic Phone</label><input className="input" placeholder="+91 XXXXX XXXXX" value={form.clinic_phone} onChange={e=>set('clinic_phone',e.target.value)}/></div>
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" disabled={mutation.isPending} onClick={()=>mutation.mutate()}>
+            <Save size={14}/>{mutation.isPending?'Saving...':'Save Profile'}
           </button>
         </div>
       </div>
@@ -73,6 +133,7 @@ const ROLE_PERMS = {
 export default function UsersPage() {
   const qc = useQueryClient()
   const [modal, setModal] = useState(false)
+  const [editDoctor, setEditDoctor] = useState(null)
 
   const { data: users=[], isLoading } = useQuery({
     queryKey: ['users'],
@@ -83,13 +144,6 @@ export default function UsersPage() {
     mutationFn: ({id, name, phone, is_active}) => api.put(`/users/${id}`, { name, phone, is_active: !is_active }),
     onSuccess: () => { toast.success('Updated'); qc.invalidateQueries(['users']) },
   })
-
-  const byRole = users.reduce((acc, u) => {
-    const r = u.role_name
-    if (!acc[r]) acc[r] = []
-    acc[r].push(u)
-    return acc
-  }, {})
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -116,7 +170,7 @@ export default function UsersPage() {
             <thead><tr>
               <th className="th">Name</th><th className="th">Email</th>
               <th className="th">Phone</th><th className="th">Role</th>
-              <th className="th">Created</th><th className="th">Status</th>
+              <th className="th">Created</th><th className="th">Status</th><th className="th"></th>
             </tr></thead>
             <tbody>
               {users.map(u=>(
@@ -140,6 +194,13 @@ export default function UsersPage() {
                       {u.is_active ? 'Active' : 'Inactive'}
                     </button>
                   </td>
+                  <td className="td">
+                    {u.role_name === 'doctor' && (
+                      <button onClick={()=>setEditDoctor(u.id)} className="btn-ghost btn-sm p-1" title="Edit doctor profile">
+                        <Pencil size={13}/>
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -148,6 +209,7 @@ export default function UsersPage() {
       )}
 
       {modal && <UserModal onClose={()=>setModal(false)} />}
+      {editDoctor && <DoctorProfileModal userId={editDoctor} onClose={()=>setEditDoctor(null)} />}
     </div>
   )
 }
