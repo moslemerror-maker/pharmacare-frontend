@@ -17,7 +17,7 @@ export default function PrescriptionView() {
     onError:()=>toast.error('Failed')
   })
 
-  const openPDF = () => window.open(`${import.meta.env.VITE_API_URL||'https://web-production-36db0.up.railway.app'}/api/prescriptions/${id}/pdf`,'_blank')
+  const openPDF = () => window.open(`${import.meta.env.VITE_API_URL||'https://web-production-36db0.up.railway.app'}/api/prescriptions/${id}/pdf?token=${localStorage.getItem('pc_token')}`,'_blank')
 
   if(isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
   if(!rx) return <div className="p-6 text-red-500">Prescription not found</div>

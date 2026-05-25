@@ -17,7 +17,7 @@ export default function SalesPage() {
     queryFn:()=>api.get('/sales',{params:{date_from:dateFrom,date_to:dateTo,bill_number:search||undefined,limit:100}}).then(r=>r.data)
   })
 
-  const openPDF = (id,e) => { e.stopPropagation(); window.open(`https://web-production-36db0.up.railway.app/api/sales/${id}/pdf`,'_blank') }
+  const openPDF = (id,e) => { e.stopPropagation(); window.open(`https://web-production-36db0.up.railway.app/api/sales/${id}/pdf?token=${localStorage.getItem('pc_token')}`,'_blank') }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">

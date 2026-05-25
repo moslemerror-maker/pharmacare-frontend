@@ -22,7 +22,7 @@ export default function PrescriptionDetail() {
     onSuccess: () => { toast.success('Status updated'); qc.invalidateQueries(['prescription', id]) }
   })
 
-  const printPdf = () => window.open(`${import.meta.env.VITE_API_URL||'https://web-production-36db0.up.railway.app'}/api/prescriptions/${id}/pdf`, '_blank')
+  const printPdf = () => window.open(`${import.meta.env.VITE_API_URL||'https://web-production-36db0.up.railway.app'}/api/prescriptions/${id}/pdf?token=${localStorage.getItem('pc_token')}`, '_blank')
   const dispense = () => navigate(`/sales/new?rx=${rx?.id}&patient=${rx?.patient_id}`)
 
   if (isLoading) return <div className="p-8 text-center text-gray-400">Loading prescription…</div>
