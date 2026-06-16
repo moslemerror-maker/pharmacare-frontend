@@ -267,7 +267,7 @@ export default function NewPrescription() {
                 <h1 className="text-xl font-bold text-gray-900">New Prescription</h1>
               </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                <span className="font-medium text-gray-700">Dr. {user?.name}</span>
+                <span className="font-medium text-gray-700">{user?.name?.match(/^Dr\.?\s/i) ? user.name : `Dr. ${user?.name}`}</span>
                 {user?.doctorProfile?.specialization && <span className="text-gray-400"> · {user.doctorProfile.specialization}</span>}
                 {user?.doctorProfile?.registration_number && <span className="text-gray-400"> · Reg: {user.doctorProfile.registration_number}</span>}
               </p>

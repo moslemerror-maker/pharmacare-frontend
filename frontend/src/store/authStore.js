@@ -6,8 +6,8 @@ export const useAuth = create(
   persist(
     (set, get) => ({
       user: null, token: null, isAuth: false,
-      login: async (email, password) => {
-        const { data } = await api.post('/auth/login', { email, password })
+      login: async (identifier, password) => {
+        const { data } = await api.post('/auth/login', { login: identifier, password })
         localStorage.setItem('pc_token', data.token)
         set({ user: data.user, token: data.token, isAuth: true })
         return data.user
