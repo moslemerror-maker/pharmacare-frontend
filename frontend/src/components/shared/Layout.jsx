@@ -45,7 +45,7 @@ export default function Layout() {
             const Icon=item.icon
             return (
               <NavLink key={item.path} to={item.path} end={item.end}
-                className={({isActive})=>`nav-link ${isActive?'nav-active':''}`}>
+                className={({isActive})=>`nav-item ${isActive?'active':''}`}>
                 <Icon size={16} className="flex-shrink-0"/>
                 <span className="flex-1">{item.label}</span>
                 {item.path==='/inventory' && <AlertBadge/>}

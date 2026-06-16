@@ -15,6 +15,10 @@ export const statusBadge = (status) => {
   return map[status] || 'badge-gray'
 }
 
+// Named aliases so pages can import { fmtDate, fmtDateTime } directly
+export const fmtDate     = fmt.date
+export const fmtDateTime = fmt.dateTime
+
 export const gstOptions = [0, 5, 12, 18]
 export const formOptions = ['Tablet','Capsule','Syrup','Injection','Cream','Drops','Inhaler','Powder','Other']
 export const scheduleOptions = ['OTC','H','H1','X','G']

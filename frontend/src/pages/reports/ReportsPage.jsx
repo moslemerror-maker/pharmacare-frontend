@@ -5,7 +5,7 @@ import api from '../../utils/api'
 import { fmt } from '../../utils/helpers'
 import { format, subDays } from 'date-fns'
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://web-production-36db0.up.railway.app'
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 const defaultFrom = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd')
 const defaultTo   = format(new Date(), 'yyyy-MM-dd')

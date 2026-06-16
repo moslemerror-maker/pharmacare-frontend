@@ -7,14 +7,25 @@ import api from '../../utils/api'
 import { useAuth } from '../../store/authStore'
 import { frequencyOptions, durationOptions } from '../../utils/helpers'
 
+function useDebounce(value, delay = 300) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
+  return debounced
+}
+
 function PatientSearch({ value, onChange }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef()
+  const dq = useDebounce(q, 250)
   const { data } = useQuery({
-    queryKey: ['pt-search', q],
-    queryFn: () => api.get('/patients', { params:{ search:q, limit:8 } }).then(r=>r.data.data),
-    enabled: q.length > 1,
+    queryKey: ['pt-search', dq],
+    queryFn: () => api.get('/patients', { params:{ search:dq, limit:8 } }).then(r=>r.data.data),
+    enabled: dq.length > 1,
+    staleTime: 30_000,
   })
   useEffect(() => {
     const h = e => { if (!ref.current?.contains(e.target)) setOpen(false) }
@@ -57,15 +68,18 @@ function MedRow({ med, idx, onChange, onRemove }) {
   const [q, setQ] = useState(med.medicine_name || '')
   const [open, setOpen] = useState(false)
   const ref = useRef()
+  const dq = useDebounce(q, 300)
   const { data: suggestions } = useQuery({
-    queryKey: ['med-suggest', q],
-    queryFn: () => api.get('/medicines', { params:{ search:q, limit:8 } }).then(r=>r.data),
-    enabled: q.length > 1 && !med.medicine_id,
+    queryKey: ['med-suggest', dq],
+    queryFn: () => api.get('/medicines', { params:{ search:dq, limit:8 } }).then(r=>r.data),
+    enabled: dq.length > 1 && !med.medicine_id,
+    staleTime: 60_000,
   })
   const { data: stockInfo } = useQuery({
     queryKey: ['med-stock', med.medicine_id],
     queryFn: () => api.get(`/inventory/batches/${med.medicine_id}`).then(r => r.data),
     enabled: !!med.medicine_id,
+    staleTime: 30_000,
   })
   const totalStock = stockInfo?.reduce((a, b) => a + b.available_qty, 0) ?? null
 
@@ -141,10 +155,12 @@ function LabRow({ test, onChange, onRemove }) {
   const [q, setQ] = useState(test.test_name || '')
   const [open, setOpen] = useState(false)
   const ref = useRef()
+  const dq = useDebounce(q, 300)
   const { data: suggestions } = useQuery({
-    queryKey: ['lab-suggest', q],
-    queryFn: () => api.get('/lab', { params:{ search:q } }).then(r=>r.data),
-    enabled: q.length > 1,
+    queryKey: ['lab-suggest', dq],
+    queryFn: () => api.get('/lab', { params:{ search:dq } }).then(r=>r.data),
+    enabled: dq.length > 1,
+    staleTime: 120_000,
   })
   useEffect(() => {
     const h = e => { if (!ref.current?.contains(e.target)) setOpen(false) }

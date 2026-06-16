@@ -48,12 +48,14 @@
   .textarea    { @apply input resize-none; }
 
   /* Badges */
-  .badge       { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium; }
-  .badge-green { @apply badge bg-forest-50 text-forest-700 border border-forest-200; }
-  .badge-red   { @apply badge bg-red-50 text-red-700 border border-red-200; }
-  .badge-amber { @apply badge bg-amber-50 text-amber-700 border border-amber-200; }
-  .badge-blue  { @apply badge bg-blue-50 text-blue-700 border border-blue-200; }
-  .badge-gray  { @apply badge bg-gray-100 text-gray-600 border border-gray-200; }
+  .badge        { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium; }
+  .badge-green  { @apply badge bg-forest-50 text-forest-700 border border-forest-200; }
+  .badge-red    { @apply badge bg-red-50 text-red-700 border border-red-200; }
+  .badge-amber  { @apply badge bg-amber-50 text-amber-700 border border-amber-200; }
+  .badge-yellow { @apply badge bg-yellow-50 text-yellow-700 border border-yellow-200; }
+  .badge-blue   { @apply badge bg-blue-50 text-blue-700 border border-blue-200; }
+  .badge-gray   { @apply badge bg-gray-100 text-gray-600 border border-gray-200; }
+  .badge-purple { @apply badge bg-purple-50 text-purple-700 border border-purple-200; }
 
   /* Tables */
   .tbl         { @apply w-full text-sm; }
@@ -62,10 +64,19 @@
   .tbl td      { @apply px-4 py-3 text-gray-700 border-b border-gray-50; }
   .tbl tbody tr { @apply hover:bg-forest-50/30 transition-colors; }
 
+  /* Table cell utilities — used as className="th" / className="td" across pages */
+  .th { @apply px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100 bg-gray-50; }
+  .td { @apply px-4 py-3 text-sm text-gray-700 border-b border-gray-50; }
+
   /* Sidebar nav */
-  .nav-item    { @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600
-                        hover:bg-forest-50 hover:text-forest-700 transition-all duration-150 cursor-pointer; }
-  .nav-item.active { @apply bg-forest-600 text-white shadow-sm; }
+  .nav-item        { @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600
+                            hover:bg-forest-50 hover:text-forest-700 transition-all duration-150 cursor-pointer; }
+  .nav-item.active { @apply bg-forest-600 text-white shadow-sm hover:bg-forest-700 hover:text-white; }
+
+  /* Prescription form tabs */
+  .tab        { @apply px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer; }
+  .tab-active { @apply border-forest-600 text-forest-700; }
+  .tab-idle   { @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300; }
   .nav-group   { @apply text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 pt-4 pb-1; }
 
   /* Page header */
@@ -105,6 +116,9 @@
 .stagger > *:nth-child(3) { animation-delay:.15s }
 .stagger > *:nth-child(4) { animation-delay:.20s }
 .stagger > *:nth-child(5) { animation-delay:.25s }
+
+/* Page enter animation */
+.page-enter { animation: fadeUp .2s ease both; }
 
 /* Print */
 @media print { .no-print { display:none!important; } }

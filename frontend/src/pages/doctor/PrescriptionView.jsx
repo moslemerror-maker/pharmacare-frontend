@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams,useNavigate } from 'react-router-dom'
 import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft,Printer,ShoppingCart,CheckCircle,FlaskConical } from 'lucide-react'
@@ -5,11 +6,20 @@ import api from '../../utils/api'
 import { fmt } from '../../utils/helpers'
 import { useAuth } from '../../store/authStore'
 import toast from 'react-hot-toast'
+import PrintModal from '../../components/shared/PrintModal'
+
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 export default function PrescriptionView() {
   const {id} = useParams(); const navigate = useNavigate()
   const {isRole} = useAuth(); const qc = useQueryClient()
-  const {data:rx,isLoading} = useQuery({queryKey:['rx',id],queryFn:()=>api.get(`/prescriptions/${id}`).then(r=>r.data)})
+  const [printUrlFn, setPrintUrlFn] = useState(null)
+  const {data:rx,isLoading} = useQuery({
+    queryKey:['rx',id],
+    queryFn:()=>api.get(`/prescriptions/${id}`).then(r=>r.data),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
 
   const dispense = useMutation({
     mutationFn:()=>api.patch(`/prescriptions/${rx.id}/status`,{status:'Dispensed'}).then(r=>r.data),
@@ -17,13 +27,17 @@ export default function PrescriptionView() {
     onError:()=>toast.error('Failed')
   })
 
-  const openPDF = () => window.open(`${import.meta.env.VITE_API_URL||'https://web-production-36db0.up.railway.app'}/api/prescriptions/${id}/pdf?token=${localStorage.getItem('pc_token')}`,'_blank')
+  const openPDF = () => {
+    const token = localStorage.getItem('pc_token')
+    setPrintUrlFn(() => (size) => `${API_BASE}/api/prescriptions/${id}/pdf?size=${size}&token=${token}`)
+  }
 
   if(isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
   if(!rx) return <div className="p-6 text-red-500">Prescription not found</div>
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <PrintModal urlFn={printUrlFn} onClose={() => setPrintUrlFn(null)} />
       <button onClick={()=>navigate(-1)} className="btn-ghost btn-sm mb-4"><ArrowLeft size={14}/>Back</button>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>

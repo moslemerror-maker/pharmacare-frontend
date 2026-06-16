@@ -1,7 +1,8 @@
 import axios from 'axios'
-const RAILWAY = 'https://web-production-36db0.up.railway.app'
+// In dev, VITE_API_URL is empty and Vite proxy handles /api → localhost:3001
+// In production, set VITE_API_URL to the on-premise backend URL (e.g. http://192.168.1.10:3001)
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL || RAILWAY) + '/api',
+  baseURL: (import.meta.env.VITE_API_URL || '') + '/api',
   timeout: 30000,
 })
 api.interceptors.request.use(cfg => {

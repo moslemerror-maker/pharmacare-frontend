@@ -5,7 +5,9 @@ import { Trash2, ArrowLeft, Search, ShoppingCart, Scan, User, Printer, X, Chevro
 import api from '../../utils/api'
 import { fmt } from '../../utils/helpers'
 import toast from 'react-hot-toast'
+import PrintModal from '../../components/shared/PrintModal'
 
+const API_BASE = import.meta.env.VITE_API_URL || ''
 const PAYMENT_MODES = ['Cash', 'Card', 'UPI', 'Credit', 'Insurance']
 const PAYMENT_ICONS = { Cash: '💵', Card: '💳', UPI: '📱', Credit: '🔖', Insurance: '🏥' }
 
@@ -35,6 +37,7 @@ export default function NewSale() {
   const [discount, setDiscount] = useState(0)
   const [amountPaid, setAmountPaid] = useState('')
   const [barcodeInput, setBarcodeInput] = useState('')
+  const [printUrlFn, setPrintUrlFn] = useState(null)
 
   useEffect(() => { barcodeRef.current?.focus() }, [])
 
@@ -42,18 +45,22 @@ export default function NewSale() {
     queryKey: ['pt-search-sale', patientSearch],
     queryFn: () => api.get('/patients', { params: { search: patientSearch, limit: 8 } }).then(r => r.data),
     enabled: patientSearch.length > 1,
+    staleTime: 30_000,
   })
   const { data: selectedPatient } = useQuery({
     queryKey: ['patient', patientId],
     queryFn: () => api.get(`/patients/${patientId}`).then(r => r.data),
     enabled: !!patientId,
+    staleTime: 60_000,
   })
   const { data: rxData } = useQuery({
     queryKey: ['rx-sale', prescriptionId],
     queryFn: () => api.get(`/prescriptions/${prescriptionId}`).then(r => r.data),
     enabled: !!prescriptionId,
+    staleTime: 60_000,
   })
 
+  // Load items from linked prescription — includes gst_rate from backend
   useEffect(() => {
     if (!rxData?.medicines?.length) return
     ;(async () => {
@@ -64,9 +71,20 @@ export default function NewSale() {
           const { data: batches } = await api.get(`/inventory/batches/${m.medicine_id}`)
           if (batches.length) {
             const b = batches[0]
-            rows.push({ medicine_id: m.medicine_id, medicine_name: m.medicine_name, batch_number: b.batch_number, expiry: b.expiry_date, mrp: parseFloat(b.mrp), quantity: m.quantity || 1, discount_percent: 0, available_qty: b.available_qty, batches })
+            rows.push({
+              medicine_id:    m.medicine_id,
+              medicine_name:  m.medicine_name,
+              batch_number:   b.batch_number,
+              expiry:         b.expiry_date,
+              mrp:            parseFloat(b.mrp),
+              quantity:       m.quantity || 1,
+              discount_percent: 0,
+              available_qty:  b.available_qty,
+              gst_rate:       m.gst_rate || 0,   // populated from prescriptions endpoint
+              batches,
+            })
           }
-        } catch {}
+        } catch { /* skip medicines with no stock */ }
       }
       if (rows.length) setItems(rows)
     })()
@@ -89,7 +107,18 @@ export default function NewSale() {
       if (idx >= 0) {
         setItems(it => it.map((x, i) => i === idx ? { ...x, quantity: x.quantity + 1 } : x))
       } else {
-        setItems(it => [...it, { medicine_id: data.medicine.id, medicine_name: data.medicine.name, batch_number: b.batch_number, expiry: b.expiry_date, mrp: parseFloat(b.mrp), quantity: 1, discount_percent: 0, available_qty: b.available_qty, batches: data.batches }])
+        setItems(it => [...it, {
+          medicine_id:     data.medicine.id,
+          medicine_name:   data.medicine.name,
+          batch_number:    b.batch_number,
+          expiry:          b.expiry_date,
+          mrp:             parseFloat(b.mrp),
+          quantity:        1,
+          discount_percent: 0,
+          available_qty:   b.available_qty,
+          gst_rate:        data.medicine.gst_rate || 0,
+          batches:         data.batches,
+        }])
       }
       setBarcodeInput('')
       toast.success(`Added: ${data.medicine.name}`)
@@ -105,7 +134,18 @@ export default function NewSale() {
     if (idx >= 0) {
       setItems(it => it.map((x, i) => i === idx ? { ...x, quantity: x.quantity + 1 } : x))
     } else {
-      setItems(it => [...it, { medicine_id: med.id, medicine_name: med.name, batch_number: b.batch_number, expiry: b.expiry_date, mrp: parseFloat(b.mrp), quantity: 1, discount_percent: 0, available_qty: b.available_qty, batches }])
+      setItems(it => [...it, {
+        medicine_id:      med.id,
+        medicine_name:    med.name,
+        batch_number:     b.batch_number,
+        expiry:           b.expiry_date,
+        mrp:              parseFloat(b.mrp),
+        quantity:         1,
+        discount_percent: 0,
+        available_qty:    b.available_qty,
+        gst_rate:         med.gst_rate || 0,
+        batches,
+      }])
     }
     setMedSearch(''); setMedResults([])
     barcodeRef.current?.focus()
@@ -114,23 +154,38 @@ export default function NewSale() {
   const changeBatch = (idx, batchNo) => {
     const b = items[idx].batches.find(x => x.batch_number === batchNo)
     if (!b) return
-    setItems(it => it.map((x, i) => i === idx ? { ...x, batch_number: batchNo, expiry: b.expiry_date, mrp: parseFloat(b.mrp), available_qty: b.available_qty } : x))
+    setItems(it => it.map((x, i) => i === idx
+      ? { ...x, batch_number: batchNo, expiry: b.expiry_date, mrp: parseFloat(b.mrp), available_qty: b.available_qty }
+      : x))
   }
 
   const updateItem = (idx, patch) => setItems(it => it.map((x, i) => i === idx ? { ...x, ...patch } : x))
   const removeItem = idx => setItems(it => it.filter((_, i) => i !== idx))
 
-  const subtotal = items.reduce((a, it) => a + it.quantity * it.mrp * (1 - (it.discount_percent || 0) / 100), 0)
-  const discAmt = subtotal * (discount / 100)
-  const total = Math.round(subtotal - discAmt)
-  const balance = total - (parseFloat(amountPaid) || 0)
+  // ── Accurate billing totals (match backend calculation exactly) ────────────
+  // Backend applies GST per-item BEFORE the overall bill discount
+  const itemLines = items.map(it => {
+    const lineTotal  = it.quantity * it.mrp
+    const itemDisc   = lineTotal * (it.discount_percent || 0) / 100
+    const taxable    = lineTotal - itemDisc
+    const gst        = taxable * (it.gst_rate || 0) / 100
+    return { taxable, gst }
+  })
+  const subtotal   = itemLines.reduce((a, v) => a + v.taxable, 0)
+  const gstTotal   = itemLines.reduce((a, v) => a + v.gst, 0)
+  const overallDiscAmt = subtotal * (discount / 100)
+  const afterDisc  = subtotal - overallDiscAmt
+  const grandTotal = Math.round(afterDisc + gstTotal)
+  const balance    = grandTotal - (parseFloat(amountPaid) || 0)
+
+  const hasGst = gstTotal > 0
 
   const mut = useMutation({
     mutationFn: d => api.post('/sales', d).then(r => r.data),
     onSuccess: r => {
       toast.success(`Bill ${r.bill_number} created!`)
-      window.open(`https://web-production-36db0.up.railway.app/api/sales/${r.id}/pdf`, '_blank')
-      navigate('/sales')
+      const token = localStorage.getItem('pc_token')
+      setPrintUrlFn(() => (size) => `${API_BASE}/api/sales/${r.id}/pdf?size=${size}&token=${token}`)
     },
     onError: e => toast.error(e.response?.data?.error || 'Failed to create bill'),
   })
@@ -138,17 +193,24 @@ export default function NewSale() {
   const submit = () => {
     if (!items.length) return toast.error('Add at least one medicine')
     mut.mutate({
-      patient_id: patientId ? parseInt(patientId) : undefined,
-      prescription_id: prescriptionId ? parseInt(prescriptionId) : undefined,
-      payment_mode: paymentMode,
+      patient_id:       patientId ? parseInt(patientId) : undefined,
+      prescription_id:  prescriptionId ? parseInt(prescriptionId) : undefined,
+      payment_mode:     paymentMode,
       discount_percent: parseFloat(discount) || 0,
-      amount_paid: parseFloat(amountPaid) || total,
-      items: items.map(it => ({ medicine_id: it.medicine_id, batch_number: it.batch_number, quantity: parseInt(it.quantity), mrp: it.mrp, discount_percent: parseFloat(it.discount_percent) || 0 })),
+      amount_paid:      parseFloat(amountPaid) || grandTotal,
+      items: items.map(it => ({
+        medicine_id:      it.medicine_id,
+        batch_number:     it.batch_number,
+        quantity:         parseInt(it.quantity),
+        mrp:              it.mrp,
+        discount_percent: parseFloat(it.discount_percent) || 0,
+      })),
     })
   }
 
   return (
     <div className="flex flex-col bg-gray-50" style={{ minHeight: 'calc(100vh - 0px)' }}>
+      <PrintModal urlFn={printUrlFn} onClose={() => { setPrintUrlFn(null); navigate('/sales') }} />
 
       {/* ── Top header bar ─────────────────────────────────── */}
       <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center gap-3 flex-shrink-0">
@@ -242,6 +304,7 @@ export default function NewSale() {
                         <p className="text-sm font-medium text-gray-800">{m.name}</p>
                         <p className="text-xs text-gray-400">{m.generic_name} · {m.form} · {m.strength}</p>
                       </div>
+                      {m.gst_rate > 0 && <span className="text-[10px] text-gray-400 flex-shrink-0">GST {m.gst_rate}%</span>}
                     </button>
                   ))}
                 </div>
@@ -259,7 +322,7 @@ export default function NewSale() {
                   <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-40">Batch / Expiry</th>
                   <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-24">MRP (₹)</th>
                   <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-center w-20">Qty</th>
-                  <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-center w-20">Disc %</th>
+                  <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-center w-20">Disc%</th>
                   <th className="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-28">Amount</th>
                   <th className="w-8" />
                 </tr>
@@ -282,7 +345,14 @@ export default function NewSale() {
                     <td className="px-3 py-2.5 text-center text-xs font-semibold text-gray-400">{i + 1}</td>
                     <td className="px-3 py-2.5">
                       <p className="font-semibold text-gray-900">{it.medicine_name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Avail: <span className={it.available_qty <= 10 ? 'text-orange-500 font-medium' : ''}>{it.available_qty} units</span></p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-gray-400">
+                          Avail: <span className={it.available_qty <= 10 ? 'text-orange-500 font-medium' : ''}>{it.available_qty} units</span>
+                        </p>
+                        {it.gst_rate > 0 && (
+                          <span className="text-[10px] text-gray-400">GST {it.gst_rate}%</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5">
                       {it.batches?.length > 1 ? (
@@ -388,23 +458,32 @@ export default function NewSale() {
             />
           </div>
 
-          {/* Bill summary */}
+          {/* Bill summary — shows accurate totals including GST */}
           <div className="px-4 py-4 flex-1 flex flex-col gap-3">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bill Summary</p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex justify-between text-sm text-gray-600">
-                <span>Subtotal</span>
+                <span>Subtotal (excl. GST)</span>
                 <span className="font-mono">{fmt.currency(subtotal)}</span>
               </div>
-              {discAmt > 0 && (
+              {overallDiscAmt > 0 && (
                 <div className="flex justify-between text-sm text-red-500">
                   <span>Discount ({discount}%)</span>
-                  <span className="font-mono">− {fmt.currency(discAmt)}</span>
+                  <span className="font-mono">− {fmt.currency(overallDiscAmt)}</span>
                 </div>
               )}
-              <div className="flex justify-between items-center pt-2 border-t-2 border-gray-900">
+              {hasGst && (
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>GST (CGST + SGST)</span>
+                  <span className="font-mono">{fmt.currency(gstTotal)}</span>
+                </div>
+              )}
+              {!hasGst && items.length > 0 && (
+                <p className="text-[10px] text-gray-400">* GST not applicable (0% rated items)</p>
+              )}
+              <div className="flex justify-between items-center pt-2 mt-1 border-t-2 border-gray-900">
                 <span className="font-bold text-gray-900 text-base">TOTAL</span>
-                <span className="font-bold text-primary text-2xl font-mono">{fmt.currency(total)}</span>
+                <span className="font-bold text-primary text-2xl font-mono">{fmt.currency(grandTotal)}</span>
               </div>
             </div>
 
@@ -414,7 +493,7 @@ export default function NewSale() {
               <input
                 type="number"
                 className="mt-1.5 w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-center text-xl font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                placeholder={String(total)}
+                placeholder={String(grandTotal)}
                 value={amountPaid}
                 onChange={e => setAmountPaid(e.target.value)}
               />
