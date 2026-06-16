@@ -39,20 +39,19 @@ export default function Layout() {
             <div><p className="font-bold text-gray-900 text-[15px]">PharmaCare Pro</p><p className="text-[11px] text-gray-400">Management System</p></div>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-0.5">
+        <nav className="flex-1 px-3 py-2 overflow-y-auto">
           {visible.map((item,i) => {
             if(item.divider) return (
-              <div key={i} className="nav-section">
-                <span className="nav-section-line"/>
-                <span className="nav-section-label">{item.divider}</span>
-                <span className="nav-section-line"/>
+              <div key={i} className="mt-4 mb-1 px-2">
+                <hr className="border-gray-100 mb-2.5"/>
+                <p className="text-[9.5px] font-bold text-gray-400 uppercase tracking-[0.13em]">{item.divider}</p>
               </div>
             )
             const Icon=item.icon
             return (
               <NavLink key={item.path} to={item.path} end={item.end}
-                className={({isActive})=>`nav-item ${isActive?'active':''}`}>
-                <Icon size={17} className="flex-shrink-0"/>
+                className={({isActive})=>`nav-item mt-0.5 ${isActive?'active':''}`}>
+                <Icon size={16} strokeWidth={1.9} className="flex-shrink-0"/>
                 <span className="flex-1 truncate">{item.label}</span>
                 {item.path==='/inventory' && <AlertBadge/>}
               </NavLink>
